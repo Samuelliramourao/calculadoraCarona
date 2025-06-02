@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Custos de Carona</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        .tooltip { position: relative; display: inline-block; }
+        .tooltip .tooltiptext {
+            visibility: hidden; width: 220px; background-color: #555; color: #fff; text-align: center;
+            border-radius: 6px; padding: 5px 0; position: absolute; z-index: 1; bottom: 125%;
+            left: 50%; margin-left: -110px; opacity: 0; transition: opacity 0.3s;
+        }
+        .tooltip .tooltiptext::after {
+            content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px;
+            border-width: 5px; border-style: solid; border-color: #555 transparent transparent transparent;
+        }
+        .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+        .action-button {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem; /* text-xs */
+            border-radius: 0.375rem; /* rounded-md */
+            transition: background-color 0.15s ease-in-out;
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 to-slate-700 text-slate-100 min-h-screen p-4 sm:p-8 flex flex-col items-center">
+
+    <div class="bg-slate-800 shadow-2xl rounded-xl p-6 sm:p-10 w-full max-w-4xl">
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl font-bold text-sky-400">Calculadora de Custos de Carona</h1>
+            <p class="text-slate-400 mt-2">Planeje e divida os gastos da sua carona semanal de forma fácil.</p>
+        </header>
+
+        <section id="participantes-section" class="mb-8 p-6 bg-slate-700 rounded-lg shadow-lg">
+            <h2 class="text-2xl font-semibold mb-4 text-sky-300">1. Participantes</h2>
+            <p class="text-slate-400 text-sm mb-2">Participantes fixos: Samuel, Camila, Thainara, Clara, Marco.</p>
+            <p class="text-slate-400 text-sm mb-4">Você pode adicionar até 5 participantes <span class="font-semibold">adicionais</span>.</p>
+            <div class="flex flex-col sm:flex-row gap-4 mb-4">
+                <input type="text" id="nome-participante-input" placeholder="Nome do participante adicional" class="flex-grow p-3 bg-slate-600 border border-slate-500 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none placeholder-slate-400">
+                <button onclick="adicionarParticipanteAdicional()" class="bg-sky-500 hover:bg-sky-600 text-white font-semibold py-3 px-6 rounded-md transition duration-150 ease-in-out">Adicionar</button>
+            </div>
+            <div id="lista-participantes-div" class="text-sm">
+                {/* Renderizado pelo JS */}
+            </div>
+        </section>
+
+        <section id="custos-config-section" class="mb-8 p-6 bg-slate-700 rounded-lg shadow-lg">
+            <h2 class="text-2xl font-semibold mb-4 text-sky-300">2. Configuração de Custos</h2>
+            <div class="mb-4">
+                <label class="block mb-2 text-slate-300">Os custos são fixos por trajeto durante a semana?</label>
+                <div class="flex gap-4">
+                    <label class="flex items-center space-x-2 p-2 rounded-md bg-slate-600 hover:bg-slate-500 cursor-pointer">
+                        <input type="radio" name="modo-custo" value="fixo" onchange="toggleModoCusto(this.value)" class="form-radio h-5 w-5 text-sky-500 bg-slate-700 border-slate-500 focus:ring-sky-500">
+                        <span>Sim, são fixos</span>
+                    </label>
+                    <label class="flex items-center space-x-2 p-2 rounded-md bg-slate-600 hover:bg-slate-500 cursor-pointer">
+                        <input type="radio" name="modo-custo" value="variavel" checked onchange="toggleModoCusto(this.value)" class="form-radio h-5 w-5 text-sky-500 bg-slate-700 border-slate-500 focus:ring-sky-500">
+                        <span>Não, variam diariamente</span>
+                    </label>
+                </div>
+            </div>
+            <div id="custos-fixos-div" class="hidden space-y-4">
+                 <p class="text-slate-400 text-sm">Informe o custo para UM TRAJETO (apenas ida, por exemplo). Este valor será aplicado para ida e para volta em todos os dias.</p>
+                <div>
+                    <label for="pedagio-fixo" class="block mb-1 text-slate-300">Pedágio FIXO por trajeto (R$):</label>
+                    <input type="number" id="pedagio-fixo" placeholder="Ex: 5.50" step="0.01" class="w-full p-3 bg-slate-600 border border-slate-500 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none placeholder-slate-400">
+                </div>
+                <div>
+                    <label for="combustivel-fixo" class="block mb-1 text-slate-300">Combustível FIXO por trajeto (R$):</label>
+                    <input type="number" id="combustivel-fixo" placeholder="Ex: 20.00" step="0.01" class="w-full p-3 bg-slate-600 border border-slate-500 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none placeholder-slate-400">
+                </div>
+            </div>
+        </section>
+
+        <section id="dias-input-section" class="mb-8 p-6 bg-slate-700 rounded-lg shadow-lg">
+            <h2 class="text-2xl font-semibold mb-4 text-sky-300">3. Detalhes Diários</h2>
+            <p class="text-slate-400 text-sm mb-4">Lembre-se: O carro comporta no máximo 5 pessoas por trajeto.</p>
+            <div id="container-dias" class="space-y-6">
+                {/* Renderizado pelo JS */}
+            </div>
+        </section>
+
+        <button onclick="calcularCustos()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-lg text-xl transition duration-150 ease-in-out shadow-md mb-2">
+            Calcular Custos da Semana
+        </button>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4 mb-8">
+            <button onclick="salvarRelatorioAtual()" id="btn-salvar-relatorio" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition duration-150 ease-in-out shadow-md disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Salvar Relatório
+            </button>
+            <button onclick="exportarRelatorioAtualTXT()" id="btn-exportar-relatorio-atual" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-6 rounded-lg transition duration-150 ease-in-out shadow-md disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Exportar Atual (.txt)
+            </button>
+            <button onclick="iniciarNovaSemana()" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg transition duration-150 ease-in-out shadow-md">
+                Nova Semana
+            </button>
+        </div>
+
+        <section id="resultados-section" class="p-6 bg-slate-700 rounded-lg shadow-lg min-h-[100px]">
+            <h2 class="text-2xl font-semibold mb-4 text-sky-300">4. Resultados</h2>
+            <div id="resultados-detalhados" class="mb-6 space-y-4"></div>
+            <div id="resumo-semanal" class="border-t border-slate-600 pt-6">
+                <h3 class="text-xl font-semibold mb-3 text-sky-400">Resumo Semanal por Pessoa:</h3>
+            </div>
+             <div id="mensagem-erro" class="hidden mt-4 p-4 bg-red-700 text-red-100 rounded-md"></div>
+             <div id="mensagem-sucesso" class="hidden mt-4 p-4 bg-green-700 text-green-100 rounded-md"></div>
+        </section>
+        
+        <section id="relatorios-salvos-section" class="mt-10 p-6 bg-slate-700 rounded-lg shadow-lg">
+            <h2 class="text-2xl font-semibold mb-4 text-sky-300">5. Relatórios Salvos</h2>
+            <div id="lista-relatorios-salvos" class="space-y-3">
+                <p class="text-slate-400 italic">Nenhum relatório salvo ainda.</p>
+            </div>
+            <button onclick="limparTodosRelatorios()" id="btn-limpar-relatorios" class="mt-6 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-md text-sm transition duration-150 ease-in-out hidden">
+                Limpar Todos os Relatórios
+            </button>
+        </section>
+
+        <footer class="text-center mt-12 text-sm text-slate-500">
+            <p>&copy; <span id="currentYear"></span> Calculadora de Carona. Todos os direitos reservados.</p>
+        </footer>
+    </div>
+
+    <script>
+        // --- Estado da Aplicação ---
+        const participantesFixos = ["Samuel", "Camila", "Thainara", "Clara", "Marco"];
+        let participantesAdicionais = []; // Será carregado do localStorage
+        let modoCusto = 'variavel'; 
+        const diasSemana = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira"];
+        const CHAVE_RELATORIOS_SALVOS = 'relatoriosCaronaSemanal_v1'; // Adicionado _v1 para evitar conflito com versões antigas
+        const CHAVE_PARTICIPANTES_ADICIONAIS = 'participantesAdicionaisCarona_v1'; // Adicionado _v1
+        let dadosCalculadosAtualmente = null;
+        const MAX_PARTICIPANTES_ADICIONAIS = 5;
+        const MAX_PESSOAS_POR_TRAJETO = 5;
+        
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+
+        // --- Funções Utilitárias ---
+        function getAllParticipantes() {
+            return [...participantesFixos, ...participantesAdicionais];
+        }
+
+        function exibirMensagem(mensagem, tipo = 'erro') {
+            const divMsg = tipo === 'erro' ? document.getElementById('mensagem-erro') : document.getElementById('mensagem-sucesso');
+            const otherDivMsg = tipo === 'erro' ? document.getElementById('mensagem-sucesso') : document.getElementById('mensagem-erro');
+            divMsg.textContent = mensagem;
+            divMsg.classList.remove('hidden');
+            otherDivMsg.classList.add('hidden');
+            setTimeout(() => divMsg.classList.add('hidden'), 5000);
+        }
+
+        // --- Gerenciamento de Participantes Adicionais (com localStorage) ---
+        function salvarParticipantesAdicionais() {
+            localStorage.setItem(CHAVE_PARTICIPANTES_ADICIONAIS, JSON.stringify(participantesAdicionais));
+        }
+
+        function carregarParticipantesAdicionais() {
+            const salvos = localStorage.getItem(CHAVE_PARTICIPANTES_ADICIONAIS);
+            if (salvos) {
+                try {
+                    participantesAdicionais = JSON.parse(salvos);
+                    if (!Array.isArray(participantesAdicionais)) { // Validação básica
+                        participantesAdicionais = [];
+                    }
+                } catch (e) {
+                    console.error("Erro ao carregar participantes adicionais:", e);
+                    participantesAdicionais = []; // Reseta se houver erro na deserialização
+                }
+            }
+        }
+
+        function adicionarParticipanteAdicional() {
+            const input = document.getElementById('nome-participante-input');
+            const nome = input.value.trim();
+            const todosParticipantesAtuais = getAllParticipantes();
+
+            if (!nome) {
+                exibirMensagem("Por favor, digite o nome do participante adicional.");
+                return;
+            }
+            if (participantesAdicionais.length >= MAX_PARTICIPANTES_ADICIONAIS) {
+                exibirMensagem(`Máximo de ${MAX_PARTICIPANTES_ADICIONAIS} participantes adicionais atingido.`);
+                return;
+            }
+            if (todosParticipantesAtuais.map(p => p.toLowerCase()).includes(nome.toLowerCase())) {
+                exibirMensagem(`O participante "${nome}" já existe na lista.`);
+                return;
+            }
+            participantesAdicionais.push(nome);
+            salvarParticipantesAdicionais(); 
+            input.value = '';
+            renderizarListaParticipantes();
+            renderizarInputsDiarios(); // Precisa atualizar os checkboxes nos dias
+            desabilitarBotoesPrincipaisAposModificacao();
+        }
+
+        function removerParticipanteAdicional(index) {
+            participantesAdicionais.splice(index, 1);
+            salvarParticipantesAdicionais(); 
+            renderizarListaParticipantes();
+            renderizarInputsDiarios(); // Precisa atualizar os checkboxes nos dias
+            desabilitarBotoesPrincipaisAposModificacao();
+        }
+
+        function renderizarListaParticipantes() {
+            const divLista = document.getElementById('lista-participantes-div');
+            let html = '<h3 class="text-lg font-medium mb-2 text-slate-200">Lista de Participantes:</h3>';
+            
+            html += '<ul class="list-disc list-inside space-y-1 mb-3">';
+            participantesFixos.forEach(nome => {
+                html += `<li class="text-slate-300">${nome} (Fixo)</li>`;
+            });
+            html += '</ul>';
+
+            if (participantesAdicionais.length > 0) {
+                html += '<h4 class="text-md font-medium mb-1 text-slate-200">Adicionais:</h4>';
+                html += '<ul class="list-disc list-inside space-y-1">';
+                participantesAdicionais.forEach((nome, index) => {
+                    html += `<li class="text-slate-300 flex justify-between items-center group">
+                                <span>${nome}</span>
+                                <button onclick="removerParticipanteAdicional(${index})" class="text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity text-xs p-1 rounded bg-slate-600 hover:bg-slate-500">Remover</button>
+                             </li>`;
+                });
+                html += '</ul>';
+            } else {
+                 html += '<p class="text-slate-400 italic text-xs">Nenhum participante adicional cadastrado.</p>';
+            }
+            divLista.innerHTML = html;
+        }
+
+        // --- Configuração de Custos e Inputs Diários ---
+        function toggleModoCusto(valor) {
+            modoCusto = valor;
+            document.getElementById('custos-fixos-div').classList.toggle('hidden', valor !== 'fixo');
+            document.querySelectorAll('.custo-diario-input-container').forEach(container => {
+                container.classList.toggle('hidden', valor === 'fixo');
+            });
+            desabilitarBotoesPrincipaisAposModificacao();
+        }
+        
+        function criarInputNumerico(id, label, placeholder) {
+            // Adicionado oninput para desabilitar botões se valores mudarem
+            return `
+                <div class="flex-1 min-w-[150px]">
+                    <label for="${id}" class="block text-xs mb-1 text-slate-400">${label} (R$):</label>
+                    <input type="number" id="${id}" placeholder="${placeholder}" step="0.01" class="w-full p-2 bg-slate-600 border border-slate-500 rounded-md focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none placeholder-slate-400 text-sm" oninput="desabilitarBotoesPrincipaisAposModificacao()">
+                </div>`;
+        }
+
+        function renderizarInputsDiarios() {
+            const containerDias = document.getElementById('container-dias');
+            containerDias.innerHTML = ''; 
+            const todosOsParticipantes = getAllParticipantes();
+
+            diasSemana.forEach((nomeDia) => {
+                // Normaliza o ID do dia para evitar problemas com caracteres especiais em seletores
+                const diaId = nomeDia.toLowerCase()
+                                   .replace(/-feira/g, '')
+                                   .replace(/[ç]/g, 'c')
+                                   .replace(/[áàâãäéèêëíìîïóòôõöúùûü]/g, c => 'aeioun'.charAt('áàâãäéèêëíìîïóòôõöúùûü'.indexOf(c)))
+                                   .replace(/\s+/g, '-'); // Garante que não haja espaços
+
+
+                let participantesCheckboxesHtml = (trajetoTipo) => {
+                    if (todosOsParticipantes.length === 0) {
+                        return '<p class="text-xs text-slate-400 mt-1">Cadastre participantes primeiro.</p>';
+                    }
+                    return todosOsParticipantes.map((pNome) => {
+                        // Normaliza o nome do participante para o atributo 'name' do checkbox
+                        const nomeParticipanteNormalizado = pNome.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+                        return `
+                        <label class="flex items-center space-x-2 text-sm p-1.5 rounded hover:bg-slate-500 cursor-pointer">
+                            <input type="checkbox" name="${diaId}-${trajetoTipo}-participante-${nomeParticipanteNormalizado}" value="${pNome}" class="form-checkbox h-4 w-4 text-sky-500 bg-slate-700 border-slate-500 focus:ring-sky-500 rounded" onchange="desabilitarBotoesPrincipaisAposModificacao()">
+                            <span class="text-slate-300">${pNome}</span>
+                        </label>
+                    `}).join('');
+                };
+
+                const htmlDia = `
+                    <div class="p-4 bg-slate-600/50 rounded-lg shadow">
+                        <h4 class="text-lg font-semibold mb-3 text-sky-400">${nomeDia}</h4>
+                        <div class="custo-diario-input-container ${modoCusto === 'fixo' ? 'hidden' : ''} space-y-3 mb-4">
+                            <p class="text-sm text-slate-300 font-medium">Custos de IDA (${nomeDia}):</p>
+                            <div class="flex flex-wrap gap-3">
+                                ${criarInputNumerico(`${diaId}-pedagio-ida`, 'Pedágio IDA', 'Ex: 5.00')}
+                                ${criarInputNumerico(`${diaId}-combustivel-ida`, 'Combustível IDA', 'Ex: 15.00')}
+                            </div>
+                            <p class="text-sm text-slate-300 font-medium mt-3">Custos de VOLTA (${nomeDia}):</p>
+                             <div class="flex flex-wrap gap-3">
+                                ${criarInputNumerico(`${diaId}-pedagio-volta`, 'Pedágio VOLTA', 'Ex: 5.00')}
+                                ${criarInputNumerico(`${diaId}-combustivel-volta`, 'Combustível VOLTA', 'Ex: 15.00')}
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div>
+                                <h5 class="text-md font-medium mb-2 text-slate-200">Participantes na IDA:</h5>
+                                <div class="space-y-1 max-h-32 overflow-y-auto p-2 bg-slate-500/30 rounded-md">${participantesCheckboxesHtml('ida')}</div>
+                            </div>
+                            <div>
+                                <h5 class="text-md font-medium mb-2 text-slate-200">Participantes na VOLTA:</h5>
+                                <div class="space-y-1 max-h-32 overflow-y-auto p-2 bg-slate-500/30 rounded-md">${participantesCheckboxesHtml('volta')}</div>
+                            </div>
+                        </div>
+                    </div>`;
+                containerDias.innerHTML += htmlDia;
+            });
+        }
+        
+        // --- Lógica de Cálculo ---
+        function calcularCustos() {
+            document.getElementById('resultados-detalhados').innerHTML = '<p class="text-slate-400">Calculando...</p>';
+            document.getElementById('resumo-semanal').innerHTML = '<h3 class="text-xl font-semibold mb-3 text-sky-400">Resumo Semanal por Pessoa:</h3>';
+            ['mensagem-erro', 'mensagem-sucesso'].forEach(id => document.getElementById(id).classList.add('hidden'));
+
+            const todosOsParticipantes = getAllParticipantes();
+             if (todosOsParticipantes.length === 0) { 
+                exibirMensagem("Não há participantes registrados para calcular os custos.");
+                document.getElementById('resultados-detalhados').innerHTML = '';
+                desabilitarBotoesPrincipaisAposModificacao();
+                return;
+            }
+
+            let pedagioFixo = 0, combustivelFixo = 0;
+            const custosFixosColetados = {};
+            if (modoCusto === 'fixo') {
+                pedagioFixo = parseFloat(document.getElementById('pedagio-fixo').value.replace(',', '.')) || 0;
+                combustivelFixo = parseFloat(document.getElementById('combustivel-fixo').value.replace(',', '.')) || 0;
+                if (pedagioFixo < 0 || combustivelFixo < 0) {
+                    exibirMensagem("Custos fixos não podem ser negativos.");
+                    document.getElementById('resultados-detalhados').innerHTML = '';
+                    desabilitarBotoesPrincipaisAposModificacao(); return;
+                }
+                custosFixosColetados.pedagio = pedagioFixo;
+                custosFixosColetados.combustivel = combustivelFixo;
+            }
+
+            let gastosSemanaisPorPessoa = {};
+            todosOsParticipantes.forEach(p => gastosSemanaisPorPessoa[p] = 0);
+            let htmlResultadosDetalhados = '';
+            const dadosDiariosColetados = []; // Para salvar no relatório
+
+            for (const nomeDia of diasSemana) {
+                const diaId = nomeDia.toLowerCase().replace(/-feira/g, '').replace(/[ç]/g, 'c').replace(/[áàâãäéèêëíìîïóòôõöúùûü]/g, c => 'aeioun'.charAt('áàâãäéèêëíìîïóòôõöúùûü'.indexOf(c))).replace(/\s+/g, '-');
+                let custoPedagioIda, custoCombustivelIda, custoPedagioVolta, custoCombustivelVolta;
+                const dadosDiaAtual = { nomeDia: nomeDia, custosVariaveis: {}, participantesIda: [], participantesVolta: [] };
+
+                if (modoCusto === 'fixo') {
+                    custoPedagioIda = pedagioFixo;
+                    custoCombustivelIda = combustivelFixo;
+                    custoPedagioVolta = pedagioFixo;
+                    custoCombustivelVolta = combustivelFixo;
+                } else {
+                    custoPedagioIda = parseFloat(document.getElementById(`${diaId}-pedagio-ida`).value.replace(',', '.')) || 0;
+                    custoCombustivelIda = parseFloat(document.getElementById(`${diaId}-combustivel-ida`).value.replace(',', '.')) || 0;
+                    custoPedagioVolta = parseFloat(document.getElementById(`${diaId}-pedagio-volta`).value.replace(',', '.')) || 0;
+                    custoCombustivelVolta = parseFloat(document.getElementById(`${diaId}-combustivel-volta`).value.replace(',', '.')) || 0;
+                    
+                    if (custoPedagioIda < 0 || custoCombustivelIda < 0 || custoPedagioVolta < 0 || custoCombustivelVolta < 0) {
+                       exibirMensagem(`Custos para ${nomeDia} não podem ser negativos.`);
+                       document.getElementById('resultados-detalhados').innerHTML = '';
+                       desabilitarBotoesPrincipaisAposModificacao(); return;
+                    }
+                    dadosDiaAtual.custosVariaveis = { pedagioIda: custoPedagioIda, combustivelIda: custoCombustivelIda, pedagioVolta: custoPedagioVolta, combustivelVolta: custoCombustivelVolta };
+                }
+
+                const custoTotalIda = custoPedagioIda + custoCombustivelIda;
+                const custoTotalVolta = custoPedagioVolta + custoCombustivelVolta;
+
+                htmlResultadosDetalhados += `<div class="p-3 bg-slate-600/70 rounded-md shadow-sm"><h5 class="font-semibold text-sky-400">${nomeDia}</h5>`;
+                
+                // Coleta participantes da IDA
+                document.querySelectorAll(`input[name^="${diaId}-ida-participante"]:checked`).forEach(cb => dadosDiaAtual.participantesIda.push(cb.value));
+                if (dadosDiaAtual.participantesIda.length > MAX_PESSOAS_POR_TRAJETO) {
+                    exibirMensagem(`Erro em ${nomeDia} (IDA): Máximo de ${MAX_PESSOAS_POR_TRAJETO} pessoas por trajeto. Selecionado: ${dadosDiaAtual.participantesIda.length}.`);
+                    desabilitarBotoesPrincipaisAposModificacao(); return;
+                }
+                if (dadosDiaAtual.participantesIda.length > 0 && custoTotalIda > 0) {
+                    const custoPorPessoaIda = custoTotalIda / dadosDiaAtual.participantesIda.length;
+                    htmlResultadosDetalhados += `<p class="text-sm text-slate-300 ml-2"><strong>IDA:</strong> Custo Total R$ ${custoTotalIda.toFixed(2)}. Por pessoa: R$ ${custoPorPessoaIda.toFixed(2)} (${dadosDiaAtual.participantesIda.join(', ')})</p>`;
+                    dadosDiaAtual.participantesIda.forEach(p => { if(gastosSemanaisPorPessoa.hasOwnProperty(p)) gastosSemanaisPorPessoa[p] += custoPorPessoaIda; });
+                } else {
+                    htmlResultadosDetalhados += `<p class="text-sm text-slate-${dadosDiaAtual.participantesIda.length > 0 ? '300' : '400'} ml-2"><strong>IDA:</strong> ${dadosDiaAtual.participantesIda.length > 0 ? 'Sem custo neste trajeto.' : 'Nenhum participante ou sem custo.'}</p>`;
+                }
+
+                // Coleta participantes da VOLTA
+                document.querySelectorAll(`input[name^="${diaId}-volta-participante"]:checked`).forEach(cb => dadosDiaAtual.participantesVolta.push(cb.value));
+                 if (dadosDiaAtual.participantesVolta.length > MAX_PESSOAS_POR_TRAJETO) {
+                    exibirMensagem(`Erro em ${nomeDia} (VOLTA): Máximo de ${MAX_PESSOAS_POR_TRAJETO} pessoas por trajeto. Selecionado: ${dadosDiaAtual.participantesVolta.length}.`);
+                    desabilitarBotoesPrincipaisAposModificacao(); return;
+                }
+                if (dadosDiaAtual.participantesVolta.length > 0 && custoTotalVolta > 0) {
+                    const custoPorPessoaVolta = custoTotalVolta / dadosDiaAtual.participantesVolta.length;
+                    htmlResultadosDetalhados += `<p class="text-sm text-slate-300 ml-2"><strong>VOLTA:</strong> Custo Total R$ ${custoTotalVolta.toFixed(2)}. Por pessoa: R$ ${custoPorPessoaVolta.toFixed(2)} (${dadosDiaAtual.participantesVolta.join(', ')})</p>`;
+                    dadosDiaAtual.participantesVolta.forEach(p => { if(gastosSemanaisPorPessoa.hasOwnProperty(p)) gastosSemanaisPorPessoa[p] += custoPorPessoaVolta; });
+                } else {
+                    htmlResultadosDetalhados += `<p class="text-sm text-slate-${dadosDiaAtual.participantesVolta.length > 0 ? '300' : '400'} ml-2"><strong>VOLTA:</strong> ${dadosDiaAtual.participantesVolta.length > 0 ? 'Sem custo neste trajeto.' : 'Nenhum participante ou sem custo.'}</p>`;
+                }
+                htmlResultadosDetalhados += `</div>`;
+                dadosDiariosColetados.push(dadosDiaAtual);
+            }
+            document.getElementById('resultados-detalhados').innerHTML = htmlResultadosDetalhados;
+
+            // Resumo Semanal
+            let htmlResumoSemanal = '<ul class="space-y-1">';
+            let houveCustos = Object.values(gastosSemanaisPorPessoa).some(v => v > 0.001); // Pequena tolerância para float
+            todosOsParticipantes.forEach(nomePessoa => {
+                 htmlResumoSemanal += `<li class="text-slate-200 flex justify-between"><span>${nomePessoa}:</span><span class="font-semibold">R$ ${(gastosSemanaisPorPessoa[nomePessoa] || 0).toFixed(2)}</span></li>`;
+            });
+            htmlResumoSemanal += '</ul>';
+
+            const resumoContainer = document.getElementById('resumo-semanal');
+            resumoContainer.innerHTML = '<h3 class="text-xl font-semibold mb-3 text-sky-400">Resumo Semanal por Pessoa:</h3>';
+            resumoContainer.innerHTML += (!houveCustos && todosOsParticipantes.length > 0) ? '<p class="text-slate-400">Nenhum custo registrado para os participantes nesta semana.</p>' : htmlResumoSemanal;
+            
+            // Prepara dados para salvar/exportar
+            dadosCalculadosAtualmente = {
+                id: Date.now(), timestamp: new Date().toLocaleString('pt-BR'),
+                participantesFixos: [...participantesFixos], participantesAdicionais: [...participantesAdicionais],
+                modoCusto: modoCusto, custosFixos: modoCusto === 'fixo' ? { ...custosFixosColetados } : null,
+                dadosDiarios: dadosDiariosColetados, gastosSemanaisPorPessoa: { ...gastosSemanaisPorPessoa },
+                htmlResultadosDetalhados: htmlResultadosDetalhados, htmlResumoSemanal: resumoContainer.innerHTML // Salva o HTML para visualização rápida
+            };
+            habilitarBotoesAcao();
+        }
+
+        // --- Controle de Botões de Ação (Salvar/Exportar) ---
+        function habilitarBotoesAcao() {
+            document.getElementById('btn-salvar-relatorio').disabled = false;
+            document.getElementById('btn-exportar-relatorio-atual').disabled = false;
+        }
+        function desabilitarBotoesPrincipaisAposModificacao() {
+            // Chamado quando qualquer input que afeta o cálculo é modificado
+            document.getElementById('btn-salvar-relatorio').disabled = true;
+            document.getElementById('btn-exportar-relatorio-atual').disabled = true;
+            dadosCalculadosAtualmente = null; // Invalida dados se algo mudou antes de salvar/exportar
+        }
+        
+        // --- Gerenciamento de Relatórios Salvos (localStorage) ---
+        function salvarRelatorioAtual() {
+            if (!dadosCalculadosAtualmente) {
+                exibirMensagem("Calcule os custos primeiro antes de salvar."); return;
+            }
+            const relatorios = JSON.parse(localStorage.getItem(CHAVE_RELATORIOS_SALVOS)) || [];
+            relatorios.unshift(dadosCalculadosAtualmente); // Adiciona no início
+            localStorage.setItem(CHAVE_RELATORIOS_SALVOS, JSON.stringify(relatorios));
+            exibirMensagem("Relatório salvo com sucesso!", "sucesso");
+            renderizarListaRelatoriosSalvos();
+            // Não desabilitar botões aqui, usuário pode querer exportar logo após salvar.
+        }
+
+        // --- Funções de Exportação para .TXT ---
+        function formatarRelatorioParaTXT(reportObject) {
+            if (!reportObject) return "Dados do relatório indisponíveis.";
+            let txt = `Relatório de Custos de Carona\n`;
+            txt += `Data de Geração: ${reportObject.timestamp}\n\n`;
+            const todosParticipantesRelatorio = [...(reportObject.participantesFixos || []), ...(reportObject.participantesAdicionais || [])];
+            txt += `Participantes Registrados: ${todosParticipantesRelatorio.join(', ')}\n\n`;
+            txt += `Modo de Custo: ${reportObject.modoCusto === 'fixo' ? 'Fixo por Trajeto' : 'Variável Diariamente'}\n`;
+            if (reportObject.modoCusto === 'fixo' && reportObject.custosFixos) {
+                txt += `  Pedágio Fixo por Trajeto: R$ ${(reportObject.custosFixos.pedagio || 0).toFixed(2)}\n`;
+                txt += `  Combustível Fixo por Trajeto: R$ ${(reportObject.custosFixos.combustivel || 0).toFixed(2)}\n`;
+            }
+            txt += "\nDetalhes Diários:\n" + "--------------------------------------------------\n";
+            reportObject.dadosDiarios.forEach(dia => {
+                txt += `${dia.nomeDia}:\n`;
+                const pedagioIda = reportObject.modoCusto === 'fixo' ? (reportObject.custosFixos.pedagio || 0) : (dia.custosVariaveis.pedagioIda || 0);
+                const combustivelIda = reportObject.modoCusto === 'fixo' ? (reportObject.custosFixos.combustivel || 0) : (dia.custosVariaveis.combustivelIda || 0);
+                const totalIda = pedagioIda + combustivelIda;
+                txt += `  IDA:\n`;
+                txt += `    Custos: Pedágio R$ ${pedagioIda.toFixed(2)}, Combustível R$ ${combustivelIda.toFixed(2)}, Total R$ ${totalIda.toFixed(2)}\n`;
+                txt += `    Participantes (${dia.participantesIda.length}): ${dia.participantesIda.length > 0 ? dia.participantesIda.join(', ') : 'Nenhum'}\n`;
+                if (dia.participantesIda.length > 0 && totalIda > 0) {
+                    txt += `    Custo por Pessoa: R$ ${(totalIda / dia.participantesIda.length).toFixed(2)}\n`;
+                }
+
+                const pedagioVolta = reportObject.modoCusto === 'fixo' ? (reportObject.custosFixos.pedagio || 0) : (dia.custosVariaveis.pedagioVolta || 0);
+                const combustivelVolta = reportObject.modoCusto === 'fixo' ? (reportObject.custosFixos.combustivel || 0) : (dia.custosVariaveis.combustivelVolta || 0);
+                const totalVolta = pedagioVolta + combustivelVolta;
+                txt += `  VOLTA:\n`;
+                txt += `    Custos: Pedágio R$ ${pedagioVolta.toFixed(2)}, Combustível R$ ${combustivelVolta.toFixed(2)}, Total R$ ${totalVolta.toFixed(2)}\n`;
+                txt += `    Participantes (${dia.participantesVolta.length}): ${dia.participantesVolta.length > 0 ? dia.participantesVolta.join(', ') : 'Nenhum'}\n`;
+                if (dia.participantesVolta.length > 0 && totalVolta > 0) {
+                    txt += `    Custo por Pessoa: R$ ${(totalVolta / dia.participantesVolta.length).toFixed(2)}\n`;
+                }
+                txt += "--------------------------------------------------\n";
+            });
+            txt += "\nResumo Semanal por Pessoa:\n" + "--------------------------------------------------\n";
+            todosParticipantesRelatorio.forEach(nomePessoa => { // Itera sobre a lista de participantes do relatório
+                 txt += `${nomePessoa}: R$ ${(reportObject.gastosSemanaisPorPessoa[nomePessoa] || 0).toFixed(2)}\n`;
+            });
+            txt += "--------------------------------------------------\n";
+            return txt;
+        }
+
+        function triggerTXTDownload(filename, textContent) {
+            const element = document.createElement('a');
+            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(textContent));
+            element.setAttribute('download', filename);
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        }
+
+        function exportarRelatorioAtualTXT() {
+            if (!dadosCalculadosAtualmente) {
+                exibirMensagem("Primeiro calcule os custos para poder exportar o relatório atual."); return;
+            }
+            const txtContent = formatarRelatorioParaTXT(dadosCalculadosAtualmente);
+            // Gera nome de arquivo mais limpo
+            const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
+            const filename = `RelatorioCarona_${dateStr}.txt`;
+            triggerTXTDownload(filename, txtContent);
+            exibirMensagem("Relatório atual exportado para .txt!", "sucesso");
+        }
+        
+        function exportarRelatorioSalvoTXT(reportId) {
+            const relatorios = JSON.parse(localStorage.getItem(CHAVE_RELATORIOS_SALVOS)) || [];
+            const relatorio = relatorios.find(r => r.id === reportId);
+            if (relatorio) {
+                const txtContent = formatarRelatorioParaTXT(relatorio);
+                const dateStr = new Date(relatorio.id).toISOString().slice(0,10).replace(/-/g,'');
+                const filename = `RelatorioCaronaSalvo_${dateStr}.txt`;
+                triggerTXTDownload(filename, txtContent);
+                exibirMensagem(`Relatório de ${relatorio.timestamp} exportado para .txt!`, "sucesso");
+            } else {
+                exibirMensagem("Relatório salvo não encontrado para exportação.");
+            }
+        }
+
+        // --- Renderização e Gerenciamento da Lista de Relatórios Salvos ---
+        function renderizarListaRelatoriosSalvos() {
+            const listaDiv = document.getElementById('lista-relatorios-salvos');
+            const relatorios = JSON.parse(localStorage.getItem(CHAVE_RELATORIOS_SALVOS)) || [];
+            document.getElementById('btn-limpar-relatorios').classList.toggle('hidden', relatorios.length === 0);
+
+            if (relatorios.length === 0) {
+                listaDiv.innerHTML = '<p class="text-slate-400 italic">Nenhum relatório salvo ainda.</p>'; return;
+            }
+            listaDiv.innerHTML = relatorios.map(relatorio => {
+                // Garante que participantesFixos e participantesAdicionais existam no objeto do relatório
+                const pFixos = relatorio.participantesFixos || [];
+                const pAdicionais = relatorio.participantesAdicionais || [];
+                const participantesExibicao = [...pFixos, ...pAdicionais];
+                
+                return `
+                <div class="p-3 bg-slate-600/70 rounded-md shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                    <div class="mb-2 sm:mb-0">
+                        <p class="font-semibold text-slate-200">Relatório de ${relatorio.timestamp}</p>
+                        <p class="text-xs text-slate-400">${participantesExibicao.length} participante(s)</p>
+                    </div>
+                    <div class="space-x-2 flex-shrink-0 mt-2 sm:mt-0">
+                        <button onclick="visualizarRelatorioSalvo(${relatorio.id})" class="action-button bg-blue-500 hover:bg-blue-600">Visualizar</button>
+                        <button onclick="exportarRelatorioSalvoTXT(${relatorio.id})" class="action-button bg-teal-500 hover:bg-teal-600">Exportar (.txt)</button>
+                        <button onclick="excluirRelatorio(${relatorio.id})" class="action-button bg-red-500 hover:bg-red-600">Excluir</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function visualizarRelatorioSalvo(reportId) {
+            const relatorio = (JSON.parse(localStorage.getItem(CHAVE_RELATORIOS_SALVOS)) || []).find(r => r.id === reportId);
+            if (relatorio) {
+                document.getElementById('resultados-detalhados').innerHTML = relatorio.htmlResultadosDetalhados;
+                document.getElementById('resumo-semanal').innerHTML = relatorio.htmlResumoSemanal;
+                exibirMensagem(`Visualizando relatório salvo de ${relatorio.timestamp}.`, "sucesso");
+                document.getElementById('resultados-section').scrollIntoView({ behavior: 'smooth' });
+                desabilitarBotoesPrincipaisAposModificacao(); // Desabilita botões de ação do formulário atual
+            } else {
+                exibirMensagem("Relatório não encontrado.");
+            }
+        }
+
+        function excluirRelatorio(reportId) {
+            let relatorios = JSON.parse(localStorage.getItem(CHAVE_RELATORIOS_SALVOS)) || [];
+            relatorios = relatorios.filter(r => r.id !== reportId);
+            localStorage.setItem(CHAVE_RELATORIOS_SALVOS, JSON.stringify(relatorios));
+            renderizarListaRelatoriosSalvos();
+            exibirMensagem("Relatório excluído.", "sucesso");
+        }
+
+        function limparTodosRelatorios() {
+            if (confirm("Tem certeza que deseja excluir TODOS os relatórios salvos? Esta ação não pode ser desfeita.")) {
+                localStorage.removeItem(CHAVE_RELATORIOS_SALVOS);
+                renderizarListaRelatoriosSalvos();
+                exibirMensagem("Todos os relatórios foram excluídos.", "sucesso");
+            }
+        }
+
+        // --- Função para Iniciar Nova Semana ---
+        function iniciarNovaSemana() {
+            // 1. Redefinir Configuração de Custos
+            document.querySelector('input[name="modo-custo"][value="variavel"]').checked = true;
+            // toggleModoCusto já chama desabilitarBotoesPrincipaisAposModificacao
+            toggleModoCusto('variavel'); 
+            document.getElementById('pedagio-fixo').value = '';
+            document.getElementById('combustivel-fixo').value = '';
+            
+            // 2. Limpar Entradas Diárias (custos e checkboxes)
+            const todosOsParticipantesAtuais = getAllParticipantes(); // Usado para limpar checkboxes corretamente
+            diasSemana.forEach(nomeDia => {
+                const diaId = nomeDia.toLowerCase().replace(/-feira/g, '').replace(/[ç]/g, 'c').replace(/[áàâãäéèêëíìîïóòôõöúùûü]/g, c => 'aeioun'.charAt('áàâãäéèêëíìîïóòôõöúùûü'.indexOf(c))).replace(/\s+/g, '-');
+                
+                // Limpar inputs de custo diário
+                ['pedagio-ida', 'combustivel-ida', 'pedagio-volta', 'combustivel-volta'].forEach(tipo => {
+                    const inputEl = document.getElementById(`${diaId}-${tipo}`);
+                    if (inputEl) inputEl.value = '';
+                });
+                
+                // Desmarcar checkboxes de participantes
+                todosOsParticipantesAtuais.forEach(pNome => {
+                    const nomeParticipanteNormalizado = pNome.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+                    ['ida', 'volta'].forEach(trajetoTipo => {
+                         const cb = document.querySelector(`input[name="${diaId}-${trajetoTipo}-participante-${nomeParticipanteNormalizado}"]`);
+                         if (cb) cb.checked = false;
+                    });
+                });
+            });
+
+            // 3. Limpar Resultados
+            document.getElementById('resultados-detalhados').innerHTML = '';
+            document.getElementById('resumo-semanal').innerHTML = '<h3 class="text-xl font-semibold mb-3 text-sky-400">Resumo Semanal por Pessoa:</h3>';
+            
+            // desabilitarBotoesPrincipaisAposModificacao(); // Já é chamado por toggleModoCusto
+            exibirMensagem("Pronto para uma nova semana! Configure os custos e detalhes diários.", "sucesso");
+            document.getElementById('custos-config-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // --- Inicialização da Aplicação ---
+        function init() {
+            carregarParticipantesAdicionais(); // Carrega participantes adicionais do localStorage
+            renderizarListaParticipantes();
+            renderizarInputsDiarios(); // Renderiza os inputs dos dias, incluindo checkboxes para todos os participantes
+            toggleModoCusto('variavel'); // Define o modo de custo inicial e atualiza a UI
+            renderizarListaRelatoriosSalvos(); // Carrega e exibe relatórios salvos
+
+            // Adiciona listeners para desabilitar botões de salvar/exportar se custos fixos mudarem
+            document.getElementById('pedagio-fixo').addEventListener('input', desabilitarBotoesPrincipaisAposModificacao);
+            document.getElementById('combustivel-fixo').addEventListener('input', desabilitarBotoesPrincipaisAposModificacao);
+        }
+
+        // Executa a inicialização quando o script é carregado
+        init();
+    </script>
+</body>
+</html>
